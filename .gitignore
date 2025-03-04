@@ -1,0 +1,9 @@
+.env
+logs/
+.idea/
+bin/
+*.exe
+*.so
+*.dylib
+*.test
+coverage.out

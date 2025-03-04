@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package final;
+
+option go_package = "github.com/0x0000abba/final";
+
+message GetRateResponse {
+  string ask = 1;
+  string bid = 2;
+  string timestamp = 4;
+}
+
+message GetRateRequest {}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  bool OK = 1;
+}
+
+service RateService {
+  rpc GetRate(GetRateRequest) returns (GetRateResponse);
+}
+
+service HealthService {
+  rpc HealthCheck (HealthCheckRequest) returns (HealthCheckResponse);
+}
