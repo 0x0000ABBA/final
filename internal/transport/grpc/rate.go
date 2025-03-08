@@ -62,7 +62,8 @@ func (s *RateServiceServer) GetRate(ctx context.Context, req *gen.GetRateRequest
 
 	if err != nil {
 		rateErrors.WithLabelValues("GetRate").Inc()
-		return nil, fmt.Errorf("error while using rate service: %w", err)
+		traceID := span.SpanContext().TraceID().String()
+		return nil, fmt.Errorf("error while using rate service: %w, TraceID: %s", err, traceID)
 	}
 
 	span.End()
