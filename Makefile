@@ -1,9 +1,7 @@
 test:
 	go test ./...
-docker-build:
-	docker compose build --no-cache
 docker-run:
-	docker compose up -d
+	docker compose up -d --build
 build:
 	go build ./cmd/main/main.go
 run:

@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
     ports:
-      - "${DB_PORT}:${DB_PORT}"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       # mount migrations into the container for initial migration
@@ -16,25 +16,48 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - app-network
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "6831:6831/udp"
+      - "16686:16686"
+      - "4317:4317"
+      - "55681:55681"
+    networks:
+      - app-network
 
   app:
     build: .
     depends_on:
       postgres:
         condition: service_healthy
+      jaeger:
+        condition: service_started
     ports:
       - "${APP_PORT}:${APP_PORT}"
+      - "9090:9090" # for prometheus http server
     environment:
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
       APP_IP: ${APP_IP}
       APP_PORT: ${APP_PORT}
+      METRICS_ENDPOINT: ":9090" # prometheus
+      TELEMETRY_ENDPOINT: "jaeger:4317"
+      MODE: ${MODE} # production/development
     command: ./main
+    networks:
+      - app-network
 
 volumes:
   postgres_data:
 networks:
-  bridge:
+  app-network:
+    driver: bridge
