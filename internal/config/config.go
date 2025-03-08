@@ -1,77 +1,106 @@
 package config
 
 import (
+	"flag"
 	"fmt"
-	"reflect"
-	"strings"
-
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
+	"os"
 )
 
-// Config is a struct that holds all environment variables
+// Config is a struct that holds all configuration variables
 type Config struct {
 	// App
-	AppIP   string `env:"APP_IP" flag:"app-ip" usage:"ip for app to listen"`
-	AppPort string `env:"APP_PORT" flag:"app-port" usage:"port for app to listen"`
+	AppIP   string
+	AppPort string
 	// DB
-	DBName     string `env:"DB_NAME" flag:"db-name" usage:"name of database"`
-	DBHost     string `env:"DB_HOST" flag:"db-host" usage:"host of database"`
-	DBPort     string `env:"DB_PORT" flag:"db-port" usage:"port of database"`
-	DBUser     string `env:"DB_USER" flag:"db-user" usage:"user of database"`
-	DBPassword string `env:"DB_PASSWORD" flag:"db-password" usage:"password for user in database"`
+	DBName     string
+	DBHost     string
+	DBPort     string
+	DBUser     string
+	DBPassword string
 	// Log
-	Mode string `env:"MODE" flag:"mode" usage:"development|production"`
+	Mode string
+	// Telemetry
+	TelemetryEndpoint string
+	// Metrics
+	MetricsEndpoint string
 }
 
 // Load parses environment variables and flags, flags have higher priority
 // Returns Config and an error if any of the required variables are not set
 func Load() (*Config, error) {
-	cfg := &Config{}
 
-	v := viper.New()
+	appIPFlag := flag.String("app-ip", "", "IP address for the application")
+	appPortFlag := flag.String("app-port", "", "Port for the application")
 
-	cfgType := reflect.TypeOf(*cfg)
+	dbNameFlag := flag.String("db-name", "", "Database name")
+	dbHostFlag := flag.String("db-host", "", "Database host")
+	dbPortFlag := flag.String("db-port", "", "Database port")
+	dbUserFlag := flag.String("db-user", "", "Database user")
+	dbPasswordFlag := flag.String("db-password", "", "Database password")
 
-	for i := 0; i < cfgType.NumField(); i++ {
-		field := cfgType.Field(i)
+	modeFlag := flag.String("mode", "", "Application mode (e.g., devцццelopment, production)")
 
-		envTag := field.Tag.Get("env")
-		flagTag := field.Tag.Get("flag")
-		usageTag := field.Tag.Get("usage")
+	telemetryEndpointFlag := flag.String("telemetry-endpoint", "", "Telemetry endpoint URL")
+	metricsEndpointFlag := flag.String("metrics-endpoint", "", "Metrics endpoint URL")
 
-		if envTag == "" && flagTag == "" {
-			continue
+	flag.Parse()
+
+	getValue := func(flagValue *string, envVar string) string {
+		if *flagValue != "" {
+			return *flagValue
 		}
-
-		if envTag != "" {
-			_ = v.BindEnv(field.Name, envTag)
-		}
-
-		if flagTag != "" {
-			pflag.String(flagTag, "", usageTag)
-			_ = v.BindPFlag(field.Name, pflag.Lookup(flagTag))
-		}
-
+		return os.Getenv(envVar)
 	}
 
-	pflag.Parse()
-
-	v.AutomaticEnv()
-	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
-
-	for i := 0; i < cfgType.NumField(); i++ {
-		field := cfgType.Field(i)
-
-		value := v.GetString(field.Name)
-		if value == "" {
-			return nil, fmt.Errorf("configuration for %s is required but not set", field.Name)
-		}
+	config := &Config{
+		AppIP:             getValue(appIPFlag, "APP_IP"),
+		AppPort:           getValue(appPortFlag, "APP_PORT"),
+		DBName:            getValue(dbNameFlag, "DB_NAME"),
+		DBHost:            getValue(dbHostFlag, "DB_HOST"),
+		DBPort:            getValue(dbPortFlag, "DB_PORT"),
+		DBUser:            getValue(dbUserFlag, "DB_USER"),
+		DBPassword:        getValue(dbPasswordFlag, "DB_PASSWORD"),
+		Mode:              getValue(modeFlag, "MODE"),
+		TelemetryEndpoint: getValue(telemetryEndpointFlag, "TELEMETRY_ENDPOINT"),
+		MetricsEndpoint:   getValue(metricsEndpointFlag, "METRICS_ENDPOINT"),
 	}
 
-	if err := v.Unmarshal(cfg); err != nil {
-		return nil, fmt.Errorf("unable to decode into config struct: %w", err)
+	missingFields := []string{}
+
+	if config.AppIP == "" {
+		missingFields = append(missingFields, "AppIP (flag: -app-ip or env: APP_IP)")
+	}
+	if config.AppPort == "" {
+		missingFields = append(missingFields, "AppPort (flag: -app-port or env: APP_PORT)")
+	}
+	if config.DBName == "" {
+		missingFields = append(missingFields, "DBName (flag: -db-name or env: DB_NAME)")
+	}
+	if config.DBHost == "" {
+		missingFields = append(missingFields, "DBHost (flag: -db-host or env: DB_HOST)")
+	}
+	if config.DBPort == "" {
+		missingFields = append(missingFields, "DBPort (flag: -db-port or env: DB_PORT)")
+	}
+	if config.DBUser == "" {
+		missingFields = append(missingFields, "DBUser (flag: -db-user or env: DB_USER)")
+	}
+	if config.DBPassword == "" {
+		missingFields = append(missingFields, "DBPassword (flag: -db-password or env: DB_PASSWORD)")
+	}
+	if config.Mode == "" {
+		missingFields = append(missingFields, "Mode (flag: -mode or env: MODE)")
+	}
+	if config.TelemetryEndpoint == "" {
+		missingFields = append(missingFields, "TelemetryEndpoint (flag: -telemetry-endpoint or env: TELEMETRY_ENDPOINT)")
+	}
+	if config.MetricsEndpoint == "" {
+		missingFields = append(missingFields, "MetricsEndpoint (flag: -metrics-endpoint or env: METRICS_ENDPOINT)")
 	}
 
-	return cfg, nil
+	if len(missingFields) > 0 {
+		return nil, fmt.Errorf("missing required configuration fields: %v", missingFields)
+	}
+
+	return config, nil
 }
